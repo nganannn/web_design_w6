@@ -2,12 +2,17 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 app = FastAPI()
 
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
+class HouseInput(BaseModel):
+    area: float
+    bedrooms: int
+    location: str = "other"
 
 @app.get("/")
 def read_root():
@@ -45,6 +50,20 @@ def get_prediction(
         "predicted_price": predicted_price
     }
 
+@app.post("/predict")
+def post_prediction(house: HouseInput):
+    predicted_price = predict_price(
+        house.area,
+        house.bedrooms,
+        house.location
+    )
+
+    return {
+        "area": house.area,
+        "bedrooms": house.bedrooms,
+        "location": house.location,
+        "predicted_price": predicted_price
+    }
 
 app.mount(
     "/static",
