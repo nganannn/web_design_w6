@@ -1,7 +1,17 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
+
+BASE_DIR = Path(__file__).resolve().parent
+FRONTEND_DIR = BASE_DIR.parent / "frontend"
+
+
+@app.get("/")
+def read_root():
+    return {"message": "House Price Prediction API"}
 
 
 def predict_price(area: float, bedrooms: int, location: str) -> float:
@@ -38,6 +48,6 @@ def get_prediction(
 
 app.mount(
     "/static",
-    StaticFiles(directory="../frontend"),
+    StaticFiles(directory=FRONTEND_DIR),
     name="static"
 )
