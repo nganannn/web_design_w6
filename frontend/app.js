@@ -9,7 +9,13 @@ const cancelBtn = document.getElementById("cancel-btn");
 async function fetchItems() {
   try {
     const response = await fetch(API_URL);
-    const items = await response.json();
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch items");
+    }
+
+    const data = await response.json();
+    const items = data.items;
 
     tableBody.innerHTML = "";
 
@@ -21,7 +27,9 @@ async function fetchItems() {
         <td>${item.name}</td>
         <td>${item.price}</td>
         <td>
-          <button class="delete-btn" data-id="${item.id}">Delete</button>
+          <button class="delete-btn" data-id="${item.id}">
+            Delete
+          </button>
         </td>
       `;
 
@@ -52,15 +60,24 @@ async function addItem(event) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ name, price }),
+      body: JSON.stringify({
+        name,
+        price,
+      }),
     });
+
+    if (response.status === 409) {
+      const data = await response.json();
+      alert(data.detail);
+      return;
+    }
 
     if (!response.ok) {
       throw new Error("Add item failed");
     }
 
     form.reset();
-    fetchItems();
+    await fetchItems();
   } catch (error) {
     console.error("Add error:", error);
     alert("Thêm dữ liệu thất bại");
@@ -77,7 +94,7 @@ async function deleteItem(id) {
       throw new Error("Delete failed");
     }
 
-    fetchItems();
+    await fetchItems();
   } catch (error) {
     console.error("Delete error:", error);
     alert("Xóa dữ liệu thất bại");
@@ -94,6 +111,9 @@ function bindDeleteButtons() {
 }
 
 form.addEventListener("submit", addItem);
-cancelBtn.addEventListener("click", () => form.reset());
+
+cancelBtn.addEventListener("click", () => {
+  form.reset();
+});
 
 fetchItems();
