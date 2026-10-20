@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Heroes Manager — Week 10</title>
+  <style>
+    :root{font-family:system-ui,Arial,sans-serif;color:#17223b;background:#f0f4fa}
+    main{max-width:920px;margin:40px auto;padding:0 20px}
+    h1{color:#233ba1}section{background:white;border-radius:14px;padding:22px;margin:18px 0;box-shadow:0 4px 18px #17223b16}
+    input,select,button{padding:10px;margin:6px 5px 6px 0;border-radius:7px;border:1px solid #c4cde0}
+    button{background:#2647d8;color:white;border:0;cursor:pointer}
+    table{width:100%;border-collapse:collapse}th,td{padding:10px;text-align:left;border-bottom:1px solid #dde3ee}th{background:#e9eeff}
+    .error{color:#b12035;white-space:pre-line}.success{color:#137548}small{color:#56617b}
+  </style>
+</head>
+<body><main>
+  <h1>Heroes Manager</h1><p>Week 10 — REST API, JSON, CORS &amp; Fetch</p>
+  <section><h2>Create hero</h2>
+    <form id="hero-form">
+      <input name="name" placeholder="Hero name" required maxlength="50">
+      <input name="secret_name" placeholder="Secret name" required>
+      <input name="age" placeholder="Age" type="number">
+      <select name="status"><option value="active">Active</option><option value="retired">Retired</option></select>
+      <select name="team_id" id="create-team"><option value="">No team</option></select>
+      <button type="submit">Create hero</button>
+    </form><p id="feedback" aria-live="polite"></p><small>Try age = -5 to see HTTP 422 validation errors.</small>
+  </section>
+  <section><h2>Hero list</h2>
+    <label for="filter-team">Filter by team:</label>
+    <select id="filter-team"><option value="">All teams</option></select>
+    <button id="refresh" type="button">Refresh</button>
+    <table id="heroes"><thead><tr><th>ID</th><th>Name</th><th>Age</th><th>Status</th><th>Team</th></tr></thead><tbody></tbody></table>
+    <p id="table-error" class="error" aria-live="polite"></p>
+  </section>
+</main>
+<script>
+const API = 'http://127.0.0.1:8000/api/v1';
+const tbody = document.querySelector('#heroes tbody');
+const feedback = document.querySelector('#feedback');
+
+async function loadTeams() {
+  const res = await fetch(`${API}/teams`);
+  if (!res.ok) throw new Error(`Teams: HTTP ${res.status}`);
+  const teams = await res.json();
+  for (const selector of ['#create-team', '#filter-team']) {
+    const select = document.querySelector(selector);
+    select.replaceChildren();
+    const initial = document.createElement('option');
+    initial.value = ''; initial.textContent = selector === '#filter-team' ? 'All teams' : 'No team';
+    select.append(initial);
+    for (const team of teams) {
+      const opt = document.createElement('option');
+      opt.value = String(team.id); opt.textContent = team.name;
+      select.append(opt);
+    }
+  }
+}
+
+async function loadHeroes() {
+  const area = document.querySelector('#table-error');
+  area.textContent = '';
+  tbody.replaceChildren();
+  try {
+    const team = document.querySelector('#filter-team').value;
+    const path = team ? `/teams/${team}/heroes` : '/heroes?limit=100';
+    const res = await fetch(`${API}${path}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const heroes = await res.json();
+    for (const h of heroes) {
+      const tr = tbody.insertRow();
+      for (const value of [h.id, h.name, h.age ?? '-', h.status, h.team_id ?? '-']) {
+        tr.insertCell().textContent = String(value); // safe: not innerHTML
+      }
+    }
+  } catch (error) {
+    area.textContent = `${error.message}. Check that the FastAPI server is running and CORS is configured.`;
+  }
+}
+
+document.querySelector('#hero-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  feedback.textContent = ''; feedback.className = '';
+  const form = event.currentTarget;
+  const data = Object.fromEntries(new FormData(form).entries());
+  if (data.age === '') delete data.age; else data.age = Number(data.age);
+  if (data.team_id === '') data.team_id = null; else data.team_id = Number(data.team_id);
+  try {
+    const res = await fetch(`${API}/heroes`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data),
+    });
+    if (res.status === 201) {
+      feedback.className = 'success'; feedback.textContent = 'Hero created successfully!';
+      form.reset(); await loadHeroes();
+    } else if (res.status === 422) {
+      const error = await res.json();
+      feedback.className = 'error';
+      feedback.textContent = error.detail.map(d => `${d.loc.at(-1)}: ${d.msg}`).join('\n');
+    } else {
+      const error = await res.json();
+      feedback.className = 'error'; feedback.textContent = `HTTP ${res.status}: ${error.detail ?? 'Error'}`;
+    }
+  } catch (error) {
+    feedback.className = 'error'; feedback.textContent = `Network/CORS error: ${error.message}`;
+  }
+});
+document.querySelector('#filter-team').addEventListener('change', loadHeroes);
+document.querySelector('#refresh').addEventListener('click', loadHeroes);
+loadTeams().then(loadHeroes).catch(err => {
+  document.querySelector('#table-error').textContent = err.message;
+});
+</script></body></html>
